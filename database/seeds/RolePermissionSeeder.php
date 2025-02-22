@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Admin;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
@@ -21,22 +22,21 @@ class RolePermissionSeeder extends Seeder
      */
     public function run()
     {
-
         /**
-         * Enable these options if you need same role and other permission for User Model
+         * Enable these options if you need same role and other permission for User
          * Else, please follow the below steps for admin guard
          */
 
-        // Create Roles and Permissions
+        // Create Roles and Permissions for Admin
         // $roleSuperAdmin = Role::create(['name' => 'superadmin']);
         // $roleAdmin = Role::create(['name' => 'admin']);
         // $roleEditor = Role::create(['name' => 'editor']);
         // $roleUser = Role::create(['name' => 'user']);
 
 
-        // Permission List as array
+        // Permission List as array for Admin and User
         $permissions = [
-
+            // Admin Permissions
             [
                 'group_name' => 'dashboard',
                 'permissions' => [
@@ -45,20 +45,8 @@ class RolePermissionSeeder extends Seeder
                 ]
             ],
             [
-                'group_name' => 'blog',
-                'permissions' => [
-                    // Blog Permissions
-                    'blog.create',
-                    'blog.view',
-                    'blog.edit',
-                    'blog.delete',
-                    'blog.approve',
-                ]
-            ],
-            [
                 'group_name' => 'admin',
                 'permissions' => [
-                    // admin Permissions
                     'admin.create',
                     'admin.view',
                     'admin.edit',
@@ -69,7 +57,6 @@ class RolePermissionSeeder extends Seeder
             [
                 'group_name' => 'role',
                 'permissions' => [
-                    // role Permissions
                     'role.create',
                     'role.view',
                     'role.edit',
@@ -80,44 +67,49 @@ class RolePermissionSeeder extends Seeder
             [
                 'group_name' => 'profile',
                 'permissions' => [
-                    // profile Permissions
                     'profile.view',
                     'profile.edit',
                     'profile.delete',
                     'profile.update',
                 ]
             ],
+            // User Permissions
+            [
+                'group_name' => 'user',
+                'permissions' => [
+                    'user.create',
+                    'user.view',
+                    'user.edit',
+                    'user.delete',
+                    'user.approve',
+                ]
+            ],
+            [
+                'group_name' => 'user_profile',
+                'permissions' => [
+                    'user_profile.view',
+                    'user_profile.edit',
+                    'user_profile.update',
+                ]
+            ],
         ];
 
 
-        // Create and Assign Permissions
-        // for ($i = 0; $i < count($permissions); $i++) {
-        //     $permissionGroup = $permissions[$i]['group_name'];
-        //     for ($j = 0; $j < count($permissions[$i]['permissions']); $j++) {
-        //         // Create Permission
-        //         $permission = Permission::create(['name' => $permissions[$i]['permissions'][$j], 'group_name' => $permissionGroup]);
-        //         $roleSuperAdmin->givePermissionTo($permission);
-        //         $permission->assignRole($roleSuperAdmin);
-        //     }
-        // }
-
-        // Do same for the admin guard for tutorial purposes.
+        // Create and Assign Permissions for Admin
         $admin = Admin::where('username', 'superadmin')->first();
         $roleSuperAdmin = $this->maybeCreateSuperAdminRole($admin);
 
-        // Create and Assign Permissions
-        for ($i = 0; $i < count($permissions); $i++) {
-            $permissionGroup = $permissions[$i]['group_name'];
-            for ($j = 0; $j < count($permissions[$i]['permissions']); $j++) {
-                $permissionExist = Permission::where('name', $permissions[$i]['permissions'][$j])->first();
+        // Create and Assign Admin Permissions
+        foreach ($permissions as $permissionGroup) {
+            $permissionGroupName = $permissionGroup['group_name'];
+            foreach ($permissionGroup['permissions'] as $permissionName) {
+                $permissionExist = Permission::where('name', $permissionName)->first();
                 if (is_null($permissionExist)) {
-                    $permission = Permission::create(
-                        [
-                            'name' => $permissions[$i]['permissions'][$j],
-                            'group_name' => $permissionGroup,
-                            'guard_name' => 'admin'
-                        ]
-                    );
+                    $permission = Permission::create([
+                        'name' => $permissionName,
+                        'group_name' => $permissionGroupName,
+                        'guard_name' => 'admin' // Guard for Admin
+                    ]);
                     $roleSuperAdmin->givePermissionTo($permission);
                     $permission->assignRole($roleSuperAdmin);
                 }
@@ -128,8 +120,38 @@ class RolePermissionSeeder extends Seeder
         if ($admin) {
             $admin->assignRole($roleSuperAdmin);
         }
+
+        // Create and Assign Permissions for User
+        $roleUser = Role::create(['name' => 'user', 'guard_name' => 'web']);  // Role for User
+
+        foreach ($permissions as $permissionGroup) {
+            $permissionGroupName = $permissionGroup['group_name'];
+            foreach ($permissionGroup['permissions'] as $permissionName) {
+                if (str_contains($permissionName, 'user.')) {  // Check for User-specific permissions
+                    $permissionExist = Permission::where('name', $permissionName)->first();
+                    if (is_null($permissionExist)) {
+                        $permission = Permission::create([
+                            'name' => $permissionName,
+                            'group_name' => $permissionGroupName,
+                            'guard_name' => 'web' // Guard for User
+                        ]);
+                        $roleUser->givePermissionTo($permission);
+                        $permission->assignRole($roleUser);
+                    }
+                }
+            }
+        }
+
+        // Assign role to some users (just an example)
+        $user = User::where('email', 'user@example.com')->first();
+        if ($user) {
+            $user->assignRole($roleUser);
+        }
     }
 
+    /**
+     * Helper method to create Super Admin Role if it doesn't exist
+     */
     private function maybeCreateSuperAdminRole($admin): Role
     {
         if (is_null($admin)) {
